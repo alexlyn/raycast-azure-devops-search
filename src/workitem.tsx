@@ -1,4 +1,4 @@
-import { ActionPanel, Action, List } from "@raycast/api"
+import { ActionPanel, Action, List, Icon } from "@raycast/api"
 import { Detail } from "@raycast/api";
 import { getPreferenceValues } from "@raycast/api"
 import { useEffect, useState } from "react";
@@ -8,7 +8,8 @@ interface WorkItem {
     id: number,
     title: string,
     state: string,
-    type: string
+    type: string,
+    assignedTo: string
 }
 
 interface State {
@@ -50,12 +51,13 @@ export default function Command() {
     
 
     const onSearchChange = async (searchText: string) => {
-        console.log("onSearchChange")
         console.log(`searchText: ${searchText}, selectedProject: ${state.selectedProject}`)
 
         if (searchText.length == 0) return
 
+        setState((previous) => ({ ...previous, isLoading: true}))
         const wiql = buildWiql(searchText)
+
         const results = await devops.workItemSearch(wiql)
         console.log(`got ${results.length} results`)
 
@@ -67,9 +69,9 @@ export default function Command() {
                 id: item.id,
                 title: item.fields["System.Title"],
                 state: item.fields["System.State"],
-                type: item.fields["System.WorkItemType"]
+                type: item.fields["System.WorkItemType"],
+                assignedTo: item.fields["System.AssignedTo"] != undefined ? item.fields["System.AssignedTo"]["displayName"] : ""
             })
-            console.log(JSON.stringify(item.fields))
         })
         setState((previous) => ({ ...previous, isLoading: false, results: newResults}))
     }
@@ -104,6 +106,7 @@ export default function Command() {
         onSearchTextChange={onSearchChange} 
         isLoading={(!state.projects && !state.error) || state.isLoading}
         enableFiltering={false}
+        throttle={true}
         searchBarAccessory={
             <List.Dropdown
                 tooltip="Select Project"
@@ -136,13 +139,38 @@ export default function Command() {
                         </ActionPanel>
                     }
                     accessories={[
-                        { text: result.state }
+                        { icon: { source: getIconForState(result.state) }, tooltip: result.state, text: result.assignedTo }
                     ]} />
             ))}
 
         </List>
     );
+}
 
+function getIconForState(state: string): string {
+    let icon = "circle-gray.svg"
+    switch (state) {
+        case "In Progress":
+            icon = "circle-blue.svg"
+            break
+        case "Blocked":
+            icon = "circle-red.svg"
+            break
+        case "Won't Fix":
+            icon = "circle-red.svg"
+            break
+        case "Testing":
+            icon = "circle-pink.svg"
+            break
+        case "Resolved":
+            icon = "circle-orange.svg"
+            break
+        case "Done":
+            icon = "circle-green.svg"
+            break
+    }
+    console.log(`icon: ${icon} for ${state}`)
+    return icon
 }
 
 function buildWiql(searchText: string): string {
@@ -152,9 +180,13 @@ function buildWiql(searchText: string): string {
                 FROM WorkItems
                 WHERE [System.Id] = ${searchText}`
     }
+
+    const words = searchText.split(" ")
+    let whereClauses: string[] = []
+    words.map((word) => { if (word.length > 0) whereClauses.push(`[System.Title] Contains Words "${word}"`) })
     return `SELECT [System.Id], [System.Title], [System.State], [System.WorkItemType], [System.AssignedTo]
         FROM WorkItems
         ORDER BY [Changed Date] Desc
-        WHERE [System.Title] Contains Words "${searchText}"
+        WHERE ${whereClauses.join(" AND ")}
     `
 }
