@@ -3,6 +3,7 @@ import { Detail } from "@raycast/api";
 import { getPreferenceValues } from "@raycast/api"
 import { useEffect, useState } from "react";
 import * as devops from "./devops"
+import * as CoreInterfaces from "azure-devops-node-api/interfaces/CoreInterfaces"
 
 interface WorkItem {
     id: number,
@@ -14,8 +15,10 @@ interface WorkItem {
 
 interface State {
     isLoading: boolean;
-    projects?: string[];
-    selectedProject: string,
+    projects: CoreInterfaces.TeamProject[],
+    selectedProjectId: string,
+    selectedProjectName: string,
+    searchText?: string,
     results?: WorkItem[];
     error?: Error;
 }
@@ -44,21 +47,20 @@ function getWorkItemTypeIcon(type: string) {
 const prefs: { domain: string; user: string; token: string; project: string } = getPreferenceValues()
 
 export default function Command() {
-    const [state, setState] = useState<State>({ isLoading: false, projects: ["Main"], selectedProject: prefs.project});
+    const [state, setState] = useState<State>({ isLoading: false, projects: [], selectedProjectName: prefs.project, selectedProjectId: ""});
 
-    const markdownLink = (item: WorkItem) => `[${item.title}](${`https://${prefs.domain}/${state.selectedProject}/_workitems/edit/${item.id}`})`
-    const htmlLink = (item: WorkItem) => `<a href="${`https://${prefs.domain}/${state.selectedProject}/_workitems/edit/${item.id}`}">${item.title}</a>`
+    const markdownLink = (item: WorkItem) => `[${item.title}](${encodeURI(`https://${prefs.domain}/${state.selectedProjectName}/_workitems/edit/${item.id}`)})`
+    const htmlLink = (item: WorkItem) => `<a href="${encodeURI(`https://${prefs.domain}/${state.selectedProjectName}/_workitems/edit/${item.id}`)}">${item.title}</a>`
     
+    const issueSearch = async (searchText?: string) => {
+        setState((previous) => ({ ...previous, isLoading: true, searchText: searchText}))
 
-    const onSearchChange = async (searchText: string) => {
-        console.log(`searchText: ${searchText}, selectedProject: ${state.selectedProject}`)
+        if (searchText == undefined) return
 
-        if (searchText.length == 0) return
-
-        setState((previous) => ({ ...previous, isLoading: true}))
+        console.log(`search for ${searchText} in ${state.selectedProjectName}`)
         const wiql = buildWiql(searchText)
 
-        const results = await devops.workItemSearch(wiql)
+        const results = await devops.workItemSearch(wiql, state.selectedProjectId)
         console.log(`got ${results.length} results`)
 
         let newResults: WorkItem[] = []
@@ -73,7 +75,14 @@ export default function Command() {
                 assignedTo: item.fields["System.AssignedTo"] != undefined ? item.fields["System.AssignedTo"]["displayName"] : ""
             })
         })
+        console.log(JSON.stringify(newResults))
         setState((previous) => ({ ...previous, isLoading: false, results: newResults}))
+    }
+
+    const onSearchChange = async (searchText: string) => {
+        console.log(`searchText: ${searchText}, selectedProjectId: ${state.selectedProjectId}`)
+
+        await issueSearch(searchText)
     }
 
     useEffect(() => {
@@ -81,9 +90,12 @@ export default function Command() {
             try {
                 const projects = await devops.getProjects()
                 console.log(`fetched ${projects.length} projects.`)
+                const defaultProject = findProjectIdByName(projects, prefs.project)
+                console.log(`default project: ${defaultProject}`)
                 setState((previous) => ({
                     ...previous,
                     isLoading: false,
+                    selectedProjectId: defaultProject,
                     projects: projects
                 }))
             } catch (error) {
@@ -94,7 +106,6 @@ export default function Command() {
                     projects: []
                 }))
             }
-    
         }
 
         fetchProjects();
@@ -111,10 +122,13 @@ export default function Command() {
             <List.Dropdown
                 tooltip="Select Project"
                 storeValue={true}
-                onChange={(newProject) => setState((previous) => ({ ...previous, selectedProject: newProject}))}
+                onChange={(newProject) => {
+                    setState((previous) => ({ ...previous, selectedProjectId: newProject}))
+                    issueSearch(state.searchText)
+                }}
             >
                 { state.projects?.map((project) => (
-                    <List.Dropdown.Item key={project} title={project} value={project} /> 
+                    <List.Dropdown.Item key={project.id} title={project.name || ""} value={project.id || ""} /> 
                 )) }
             </List.Dropdown>
         }
@@ -129,8 +143,8 @@ export default function Command() {
                     actions={
                         <ActionPanel>
                             <ActionPanel.Section title="URL">
-                                <Action.OpenInBrowser url={`https://${prefs.domain}/${state.selectedProject}/_workitems/edit/${result.id}`}/>
-                                <Action.CopyToClipboard content={`https://${prefs.domain}/${state.selectedProject}/_workitems/edit/${result.id}`} />
+                                <Action.OpenInBrowser url={encodeURI(`https://${prefs.domain}/${state.selectedProjectName}/_workitems/edit/${result.id}`)}/>
+                                <Action.CopyToClipboard content={encodeURI(`https://${prefs.domain}/${state.selectedProjectName}/_workitems/edit/${result.id}`)} />
                             </ActionPanel.Section>
                             <ActionPanel.Section title="Link">
                                 <Action.CopyToClipboard content={markdownLink(result)} title="Copy Markdown Link"/>
@@ -169,7 +183,6 @@ function getIconForState(state: string): string {
             icon = "circle-green.svg"
             break
     }
-    console.log(`icon: ${icon} for ${state}`)
     return icon
 }
 
@@ -189,4 +202,18 @@ function buildWiql(searchText: string): string {
         ORDER BY [Changed Date] Desc
         WHERE ${whereClauses.join(" AND ")}
     `
+}
+
+function findProjectIdByName(projects: CoreInterfaces.TeamProject[], defaultProject: string): string {
+    projects.forEach((project) => {
+        if (project.name == defaultProject) return project.id
+    })
+    return ""
+}
+
+function findProjectNameById(projects: CoreInterfaces.TeamProject[], id: string): string {
+    projects.forEach((project) => {
+        if (project.id == id) return project.name
+    })
+    return ""
 }
