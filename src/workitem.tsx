@@ -223,13 +223,14 @@ function buildWiql(searchText: string): string {
     whereClauses = whereClauses.concat(textClauses)
     console.log(whereClauses)
 
-    let assignedToRegex: RegExp = /(["'])(?:\\.|[^\\])*?\1/
+    //let assignedToRegex: RegExp = /(["'])(?:\\.|[^\\])*?\1/
     const assignedTo = collectPrefixed("@", terms)
         .map((term) => term.toLowerCase() == "me" ? `[System.AssignedTo] = @${term}` : `[System.AssignedTo] Contains "${term}"`)
-
-        // .filter((term) => assignedToRegex.test(term))
-        // .map((term) => `[System.AssignedTo] = ${term}`)
     whereClauses = whereClauses.concat(assignedTo)
+
+    const wiType = collectPrefixed("#", terms)
+        .map((term) => `[System.WorkItemType] Contains "${term}"`)
+    whereClauses = whereClauses.concat(wiType)
 
     if (whereClauses.length == 0) return ""
 
