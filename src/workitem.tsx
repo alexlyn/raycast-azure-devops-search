@@ -53,12 +53,13 @@ export default function Command() {
     const htmlLink = (item: WorkItem) => `<a href="${encodeURI(`https://${prefs.domain}/${state.selectedProjectName}/_workitems/edit/${item.id}`)}">${item.title}</a>`
     
     const issueSearch = async (searchText?: string) => {
-        setState((previous) => ({ ...previous, isLoading: true, searchText: searchText}))
-
         if (searchText == undefined) return
 
         console.log(`search for ${searchText} in ${state.selectedProjectName}`)
         const wiql = buildWiql(searchText)
+        if (wiql.length == 0) return
+
+        setState((previous) => ({ ...previous, isLoading: true, searchText: searchText}))
 
         const results = await devops.workItemSearch(wiql, state.selectedProjectId)
         console.log(`got ${results.length} results`)
@@ -187,21 +188,58 @@ function getIconForState(state: string): string {
 }
 
 function buildWiql(searchText: string): string {
-    if (!isNaN(Number(searchText))) {
-        // Search string is a number. Search by work item ID
+    const collectPrefixed = (prefix: string, terms: string[]): string[] =>
+    terms
+        .filter((term) => term.startsWith(prefix) && term.length > prefix.length)
+        .map((term) => term.substring(prefix.length))
+
+    const isItemId = (searchText: string): boolean => {
+        let intRegex: RegExp = /^\d+$/
+        if (searchText.length > 0 && intRegex.test(searchText)) return true
+        return false
+    }
+
+    // Search string is a number. Search by work item ID
+    if (isItemId(searchText)) {
         return `SELECT [System.Id], [System.Title], [System.State], [System.WorkItemType], [System.AssignedTo]
                 FROM WorkItems
                 WHERE [System.Id] = ${searchText}`
     }
+    console.log('not item search. building query')
 
-    const words = searchText.split(" ")
+    // Build WIQL
+    const spaceAndInvalidChars = /[ "]/
+    const terms = searchText.split(spaceAndInvalidChars).filter((term) => term.length > 0)
+
     let whereClauses: string[] = []
-    words.map((word) => { if (word.length > 0) whereClauses.push(`[System.Title] Contains Words "${word}"`) })
-    return `SELECT [System.Id], [System.Title], [System.State], [System.WorkItemType], [System.AssignedTo]
-        FROM WorkItems
-        ORDER BY [Changed Date] Desc
-        WHERE ${whereClauses.join(" AND ")}
+
+    const unwantedTextTermChars = /[-+!*&]/
+
+    const textClauses = terms
+        .filter((term) => !"@#".includes(term[0]))
+        .flatMap((term) => term.split(unwantedTextTermChars))
+        .filter((term) => term.length > 0)
+        .map((term) => `[System.Title] Contains Words "${term}"`)
+    whereClauses = whereClauses.concat(textClauses)
+    console.log(whereClauses)
+
+    let assignedToRegex: RegExp = /(["'])(?:\\.|[^\\])*?\1/
+    const assignedTo = collectPrefixed("@", terms)
+        .map((term) => term.toLowerCase() == "me" ? `[System.AssignedTo] = @${term}` : `[System.AssignedTo] Contains "${term}"`)
+
+        // .filter((term) => assignedToRegex.test(term))
+        // .map((term) => `[System.AssignedTo] = ${term}`)
+    whereClauses = whereClauses.concat(assignedTo)
+
+    if (whereClauses.length == 0) return ""
+
+    const wiql = `SELECT [System.Id], [System.Title], [System.State], [System.WorkItemType], [System.AssignedTo]
+    FROM WorkItems
+    ORDER BY [Changed Date] Desc
+    WHERE ${whereClauses.join(" AND ")}
     `
+    console.log(wiql)
+    return wiql
 }
 
 function findProjectIdByName(projects: CoreInterfaces.TeamProject[], defaultProject: string): string {
