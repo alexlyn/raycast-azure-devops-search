@@ -6,7 +6,7 @@ import * as WorkItemTrackingInterfaces from "azure-devops-node-api/interfaces/Wo
 import { getPreferenceValues } from "@raycast/api"
 import fetch, { FetchError, Response } from "node-fetch"
 
-const prefs: { domain: string; user: string; token: string } = getPreferenceValues()
+const prefs: { domain: string; user: string; token: string; project: string } = getPreferenceValues()
 
 // Create the Azure DevOps connection
 let authHandler = azdev.getPersonalAccessTokenHandler(prefs.token)
@@ -19,6 +19,7 @@ export async function workItemSearch(
 ): Promise<WorkItemTrackingInterfaces.WorkItem[]> {
     console.log("workItemSearch")
     console.log(`project: ${projectId}`)
+    console.log(`wiql: ${wiql}`)
 
     // Create the WIT client
     let witClient: wit.WorkItemTrackingApi = await connection.getWorkItemTrackingApi()
@@ -60,6 +61,37 @@ export async function workItemSearch(
     let workItems = await witClient.getWorkItemsBatch(b)
     //console.log(JSON.stringify(workItems))
     return workItems
+}
+
+export async function querySearch(
+    search: string,
+    projectId?: string
+): Promise<WorkItemTrackingInterfaces.QueryHierarchyItemsResult> {
+    console.log("querySearch")
+    console.log(`project: ${projectId}`)
+    console.log(`search for: ${search}`)
+
+    // Create the WIT client
+    let witClient: wit.WorkItemTrackingApi = await connection.getWorkItemTrackingApi()
+    let coreClient: core.CoreApi = await connection.getCoreApi()
+
+    // Execute query
+
+    // Define team context using the selected project
+    let teamContext: CoreInterfaces.TeamContext | undefined = undefined
+    if (projectId != undefined) {
+        const project: CoreInterfaces.TeamProject = await coreClient.getProject(projectId)
+        teamContext = {
+            project: project.name,
+            projectId: projectId,
+            team: project.defaultTeam?.name,
+            teamId: project.defaultTeam?.id
+        }
+    }
+    console.log(`teamContext: ${teamContext?.project}`)
+    let queryResult = await witClient.searchQueries(teamContext && teamContext.project ? teamContext.project : prefs.project, search, 20)
+
+    return queryResult
 }
 
 export async function getProjects(): Promise<CoreInterfaces.TeamProject[]> {

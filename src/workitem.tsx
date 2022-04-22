@@ -5,7 +5,7 @@ import { useEffect, useState } from "react";
 import * as devops from "./devops"
 import * as CoreInterfaces from "azure-devops-node-api/interfaces/CoreInterfaces"
 
-interface WorkItem {
+export interface WorkItem {
     id: number,
     title: string,
     state: string,
@@ -86,53 +86,55 @@ export default function Command() {
         await issueSearch(searchText)
     }
 
-    useEffect(() => {
-        async function fetchProjects() {
-            try {
-                const projects = await devops.getProjects()
-                console.log(`fetched ${projects.length} projects.`)
-                const defaultProject = findProjectIdByName(projects, prefs.project)
-                console.log(`default project: ${defaultProject}`)
-                setState((previous) => ({
-                    ...previous,
-                    isLoading: false,
-                    selectedProjectId: defaultProject,
-                    projects: projects
-                }))
-            } catch (error) {
-                setState((previous) => ({
-                    ...previous,
-                    error: error instanceof Error ? error : new Error("Something went wrong"),
-                    isLoading: false,
-                    projects: []
-                }))
-            }
-        }
+    // Removing the project list, at least temporarily because it doesn't affect results.
+    //
+    // useEffect(() => {
+    //     async function fetchProjects() {
+    //         try {
+    //             const projects = await devops.getProjects()
+    //             console.log(`fetched ${projects.length} projects.`)
+    //             const defaultProject = findProjectIdByName(projects, prefs.project)
+    //             console.log(`default project: ${defaultProject}`)
+    //             setState((previous) => ({
+    //                 ...previous,
+    //                 isLoading: false,
+    //                 selectedProjectId: defaultProject,
+    //                 projects: projects
+    //             }))
+    //         } catch (error) {
+    //             setState((previous) => ({
+    //                 ...previous,
+    //                 error: error instanceof Error ? error : new Error("Something went wrong"),
+    //                 isLoading: false,
+    //                 projects: []
+    //             }))
+    //         }
+    //     }
 
-        fetchProjects();
-    }, [])
+    //     fetchProjects();
+    // }, [])
 
     return (
     <List 
-        searchBarPlaceholder={'Search work items'} 
-        onSearchTextChange={onSearchChange} 
+        searchBarPlaceholder={'Search work items'}
+        onSearchTextChange={onSearchChange}
         isLoading={(!state.projects && !state.error) || state.isLoading}
         enableFiltering={false}
         throttle={true}
-        searchBarAccessory={
-            <List.Dropdown
-                tooltip="Select Project"
-                storeValue={true}
-                onChange={(newProject) => {
-                    setState((previous) => ({ ...previous, selectedProjectId: newProject}))
-                    issueSearch(state.searchText)
-                }}
-            >
-                { state.projects?.map((project) => (
-                    <List.Dropdown.Item key={project.id} title={project.name || ""} value={project.id || ""} /> 
-                )) }
-            </List.Dropdown>
-        }
+        // searchBarAccessory={
+        //     <List.Dropdown
+        //         tooltip="Select Project"
+        //         storeValue={true}
+        //         onChange={(newProject) => {
+        //             setState((previous) => ({ ...previous, selectedProjectId: newProject}))
+        //             issueSearch(state.searchText)
+        //         }}
+        //     >
+        //         { state.projects?.map((project) => (
+        //             <List.Dropdown.Item key={project.id} title={project.name || ""} value={project.id || ""} /> 
+        //         )) }
+        //     </List.Dropdown>
+        // }
         >
             { state.results?.map((result) => (
                 <List.Item 
@@ -243,7 +245,7 @@ function buildWiql(searchText: string): string {
     return wiql
 }
 
-function findProjectIdByName(projects: CoreInterfaces.TeamProject[], defaultProject: string): string {
+export function findProjectIdByName(projects: CoreInterfaces.TeamProject[], defaultProject: string): string {
     projects.forEach((project) => {
         if (project.name == defaultProject) return project.id
     })

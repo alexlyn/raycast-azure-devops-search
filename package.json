@@ -16,6 +16,12 @@
       "title": "Search work items",
       "description": "Search Azure DevOps issues by ID, text, type and project",
       "mode": "view"
+    },
+    {
+      "name": "query",
+      "title": "Search queries",
+      "description": "Search Azure DevOps queries",
+      "mode": "view"
     }
   ],
   "preferences": [
@@ -25,14 +31,6 @@
       "required": true,
       "title": "Azure DevOps Domain",
       "description": "Your Azure DevOps domain (e.g. 'dev.azure.com/mycompany')"
-    },
-    {
-      "name": "user",
-      "type": "textfield",
-      "required": true,
-      "title": "User Name",
-      "description": "Your Azure DevOps user name",
-      "placeholder": "me@company.com"
     },
     {
       "name": "token",
@@ -47,13 +45,6 @@
       "required": true,
       "title": "Project",
       "description": "Default project to search"
-    },
-    {
-      "name": "team",
-      "type": "textfield",
-      "required": true,
-      "title": "Team",
-      "description": "Team to search"
     }
   ],
   "dependencies": {
