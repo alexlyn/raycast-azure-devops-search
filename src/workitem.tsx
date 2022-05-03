@@ -1,9 +1,10 @@
-import { ActionPanel, Action, List, Icon } from "@raycast/api"
+import { ActionPanel, Action, List, Icon, showToast, Toast } from "@raycast/api"
 import { Detail } from "@raycast/api";
 import { getPreferenceValues } from "@raycast/api"
 import { useEffect, useState } from "react";
 import * as devops from "./devops"
 import * as CoreInterfaces from "azure-devops-node-api/interfaces/CoreInterfaces"
+import { ErrorText } from "./exception"
 
 export interface WorkItem {
     id: number,
@@ -61,23 +62,49 @@ export default function Command() {
 
         setState((previous) => ({ ...previous, isLoading: true, searchText: searchText}))
 
-        const results = await devops.workItemSearch(wiql, state.selectedProjectId)
-        console.log(`got ${results.length} results`)
+        devops.workItemSearch(wiql, state.selectedProjectId)
+            .then((results) => {
+                console.log(`got ${results.length} results`)
 
-        let newResults: WorkItem[] = []
-        results.map((item) => {
-            if (item.id == undefined || item.fields == undefined) return
-
-            newResults.push({
-                id: item.id,
-                title: item.fields["System.Title"],
-                state: item.fields["System.State"],
-                type: item.fields["System.WorkItemType"],
-                assignedTo: item.fields["System.AssignedTo"] != undefined ? item.fields["System.AssignedTo"]["displayName"] : ""
+                let newResults: WorkItem[] = []
+                results.map((item) => {
+                    if (item.id == undefined || item.fields == undefined) return
+        
+                    newResults.push({
+                        id: item.id,
+                        title: item.fields["System.Title"],
+                        state: item.fields["System.State"],
+                        type: item.fields["System.WorkItemType"],
+                        assignedTo: item.fields["System.AssignedTo"] != undefined ? item.fields["System.AssignedTo"]["displayName"] : ""
+                    })
+                })
+                console.log(JSON.stringify(newResults))
+                setState((previous) => ({ ...previous, results: newResults}))
             })
-        })
-        console.log(JSON.stringify(newResults))
-        setState((previous) => ({ ...previous, isLoading: false, results: newResults}))
+            .catch((e) => {
+                setState((previous) => ({ ...previous, results: [], error: ErrorText(e.name, e.message)}))
+            })
+            .finally(() => {
+                setState((previous) => ({ ...previous, isLoading: false}))
+            })
+
+        // const results = await devops.workItemSearch(wiql, state.selectedProjectId)
+        // console.log(`got ${results.length} results`)
+
+        // let newResults: WorkItem[] = []
+        // results.map((item) => {
+        //     if (item.id == undefined || item.fields == undefined) return
+
+        //     newResults.push({
+        //         id: item.id,
+        //         title: item.fields["System.Title"],
+        //         state: item.fields["System.State"],
+        //         type: item.fields["System.WorkItemType"],
+        //         assignedTo: item.fields["System.AssignedTo"] != undefined ? item.fields["System.AssignedTo"]["displayName"] : ""
+        //     })
+        // })
+        // console.log(JSON.stringify(newResults))
+        // setState((previous) => ({ ...previous, isLoading: false, results: newResults}))
     }
 
     const onSearchChange = async (searchText: string) => {
@@ -113,6 +140,10 @@ export default function Command() {
 
     //     fetchProjects();
     // }, [])
+
+    if (state.error) {
+        showToast(Toast.Style.Failure, state.error.name, state.error.message)
+    }
 
     return (
     <List 

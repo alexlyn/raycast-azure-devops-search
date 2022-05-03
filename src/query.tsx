@@ -1,4 +1,4 @@
-import { ActionPanel, Action, List, Icon } from "@raycast/api"
+import { ActionPanel, Action, List, Icon, showToast, Toast } from "@raycast/api"
 import { Detail } from "@raycast/api";
 import { getPreferenceValues } from "@raycast/api"
 import { useEffect, useState } from "react";
@@ -6,6 +6,7 @@ import * as devops from "./devops"
 import * as workitem from "./workitem"
 import * as CoreInterfaces from "azure-devops-node-api/interfaces/CoreInterfaces"
 import { QueryType } from "azure-devops-node-api/interfaces/WorkItemTrackingInterfaces";
+import { ErrorText, PresentableError } from "./exception"
 
 const prefs: { domain: string; user: string; token: string; project: string } = getPreferenceValues()
 
@@ -36,22 +37,31 @@ export default function Command() {
 
         setState((previous) => ({ ...previous, isLoading: true, searchText: searchText}))
 
-        const results = await devops.querySearch(searchText, projectId ? projectId : state.selectedProjectId)
-        console.log(`got ${results.value?.length} results`)
-        if (!results.value) return
+        devops.querySearch(searchText, projectId ? projectId : state.selectedProjectId)
+            .then((results) => {
+                console.log(`got ${results.value?.length} results`)
+                if (!results.value) return
 
-        let newResults: Query[] = []
-        results.value.map((item) => {
-            if (item.id == undefined || item.name == undefined) return
+                let newResults: Query[] = []
+                results.value.map((item) => {
+                    if (item.id == undefined || item.name == undefined) return
 
-            newResults.push({
-                id: item.id,
-                name: item.name,
-                type: item.queryType
+                    newResults.push({
+                        id: item.id,
+                        name: item.name,
+                        type: item.queryType
+                    })
+                })
+                console.log(JSON.stringify(newResults))
+                setState((previous) => ({ ...previous, queryResults: newResults}))                
             })
-        })
-        console.log(JSON.stringify(newResults))
-        setState((previous) => ({ ...previous, isLoading: false, queryResults: newResults}))
+            .catch((e) => {
+                setState((previous) => ({ ...previous, results: [], error: ErrorText(e.name, e.message)}))
+            })
+            .finally(() => {
+                setState((previous) => ({ ...previous, isLoading: false}))
+            })
+
     }
 
     const onSearchChange = async (searchText: string) => {
@@ -76,7 +86,7 @@ export default function Command() {
             } catch (error) {
                 setState((previous) => ({
                     ...previous,
-                    error: error instanceof Error ? error : new Error("Something went wrong"),
+                    error: new PresentableError("Error", "Cannot connect to Azure DevOps. Check domain and PAT."),
                     isLoading: false,
                     projects: []
                 }))
@@ -86,6 +96,10 @@ export default function Command() {
         fetchProjects();
     }, [])
     
+    if (state.error) {
+        showToast(Toast.Style.Failure, state.error.name, state.error.message)
+    }
+
     return (
         <List 
             searchBarPlaceholder={'Search queries'} 

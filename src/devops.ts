@@ -5,6 +5,7 @@ import * as CoreInterfaces from "azure-devops-node-api/interfaces/CoreInterfaces
 import * as WorkItemTrackingInterfaces from "azure-devops-node-api/interfaces/WorkItemTrackingInterfaces"
 import { getPreferenceValues } from "@raycast/api"
 import fetch, { FetchError, Response } from "node-fetch"
+import { PresentableError } from "./exception"
 
 const prefs: { domain: string; user: string; token: string; project: string } = getPreferenceValues()
 
@@ -21,46 +22,51 @@ export async function workItemSearch(
     console.log(`project: ${projectId}`)
     console.log(`wiql: ${wiql}`)
 
-    // Create the WIT client
-    let witClient: wit.WorkItemTrackingApi = await connection.getWorkItemTrackingApi()
-    let coreClient: core.CoreApi = await connection.getCoreApi()
+    try {
+        // Create the WIT client
+        let witClient: wit.WorkItemTrackingApi = await connection.getWorkItemTrackingApi()
+        let coreClient: core.CoreApi = await connection.getCoreApi()
 
-    // Execute query
-    let wiqlQuery : WorkItemTrackingInterfaces.Wiql = {
-        query: wiql
-    }
-    // Define team context using the selected project
-    let teamContext: CoreInterfaces.TeamContext | undefined = undefined
-    if (projectId != undefined) {
-        const project: CoreInterfaces.TeamProject = await coreClient.getProject(projectId)
-        teamContext = {
-            project: project.name,
-            projectId: projectId,
-            team: project.defaultTeam?.name,
-            teamId: project.defaultTeam?.id
+        // Execute query
+        let wiqlQuery : WorkItemTrackingInterfaces.Wiql = {
+            query: wiql
         }
+        // Define team context using the selected project
+        let teamContext: CoreInterfaces.TeamContext | undefined = undefined
+        if (projectId != undefined) {
+            const project: CoreInterfaces.TeamProject = await coreClient.getProject(projectId)
+            teamContext = {
+                project: project.name,
+                projectId: projectId,
+                team: project.defaultTeam?.name,
+                teamId: project.defaultTeam?.id
+            }
+        }
+
+        let queryResult = await witClient.queryByWiql(wiqlQuery, teamContext, undefined, 20)
+
+        if (queryResult.workItems == undefined || queryResult.workItems.length == 0) {
+            const empty: WorkItemTrackingInterfaces.WorkItem[] = []
+            return empty
+        }
+
+        // Get work items
+        let ids: number[] = []
+        queryResult.workItems?.forEach((wi) => {if (wi.id != undefined) ids.push(wi.id)})
+        let fields: string[] = []
+        queryResult.columns?.forEach((col) => {if (col.referenceName != undefined) fields.push(col.referenceName)})
+
+        let b: WorkItemTrackingInterfaces.WorkItemBatchGetRequest = {
+            ids: ids,
+            fields: fields
+        }
+        let workItems = await witClient.getWorkItemsBatch(b)
+        //console.log(JSON.stringify(workItems))
+        return workItems
+    } catch (error) {
+        console.log(error);
+        throw new PresentableError("Error", "Cannot connect to Azure DevOps. Check domain and PAT.");
     }
-
-    let queryResult = await witClient.queryByWiql(wiqlQuery, teamContext, undefined, 20)
-
-    if (queryResult.workItems == undefined || queryResult.workItems.length == 0) {
-        const empty: WorkItemTrackingInterfaces.WorkItem[] = []
-        return empty
-    }
-
-    // Get work items
-    let ids: number[] = []
-    queryResult.workItems?.forEach((wi) => {if (wi.id != undefined) ids.push(wi.id)})
-    let fields: string[] = []
-    queryResult.columns?.forEach((col) => {if (col.referenceName != undefined) fields.push(col.referenceName)})
-
-    let b: WorkItemTrackingInterfaces.WorkItemBatchGetRequest = {
-        ids: ids,
-        fields: fields
-    }
-    let workItems = await witClient.getWorkItemsBatch(b)
-    //console.log(JSON.stringify(workItems))
-    return workItems
 }
 
 export async function querySearch(
@@ -71,27 +77,33 @@ export async function querySearch(
     console.log(`project: ${projectId}`)
     console.log(`search for: ${search}`)
 
-    // Create the WIT client
-    let witClient: wit.WorkItemTrackingApi = await connection.getWorkItemTrackingApi()
-    let coreClient: core.CoreApi = await connection.getCoreApi()
+    try {
+        // Create the WIT client
+        let witClient: wit.WorkItemTrackingApi = await connection.getWorkItemTrackingApi()
+        let coreClient: core.CoreApi = await connection.getCoreApi()
 
-    // Execute query
+        // Execute query
 
-    // Define team context using the selected project
-    let teamContext: CoreInterfaces.TeamContext | undefined = undefined
-    if (projectId != undefined) {
-        const project: CoreInterfaces.TeamProject = await coreClient.getProject(projectId)
-        teamContext = {
-            project: project.name,
-            projectId: projectId,
-            team: project.defaultTeam?.name,
-            teamId: project.defaultTeam?.id
+        // Define team context using the selected project
+        let teamContext: CoreInterfaces.TeamContext | undefined = undefined
+        if (projectId != undefined) {
+            const project: CoreInterfaces.TeamProject = await coreClient.getProject(projectId)
+            teamContext = {
+                project: project.name,
+                projectId: projectId,
+                team: project.defaultTeam?.name,
+                teamId: project.defaultTeam?.id
+            }
         }
-    }
-    console.log(`teamContext: ${teamContext?.project}`)
-    let queryResult = await witClient.searchQueries(teamContext && teamContext.project ? teamContext.project : prefs.project, search, 20)
+        console.log(`teamContext: ${teamContext?.project}`)
+        let queryResult = await witClient.searchQueries(teamContext && teamContext.project ? teamContext.project : prefs.project, search, 20)
 
-    return queryResult
+        return queryResult
+    } catch (error) {
+        console.log(error);
+        throw new PresentableError("Error", "Cannot connect to Azure DevOps. Check domain and PAT.");
+    }
+
 }
 
 export async function getProjects(): Promise<CoreInterfaces.TeamProject[]> {
