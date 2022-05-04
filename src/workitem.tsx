@@ -87,24 +87,6 @@ export default function Command() {
             .finally(() => {
                 setState((previous) => ({ ...previous, isLoading: false}))
             })
-
-        // const results = await devops.workItemSearch(wiql, state.selectedProjectId)
-        // console.log(`got ${results.length} results`)
-
-        // let newResults: WorkItem[] = []
-        // results.map((item) => {
-        //     if (item.id == undefined || item.fields == undefined) return
-
-        //     newResults.push({
-        //         id: item.id,
-        //         title: item.fields["System.Title"],
-        //         state: item.fields["System.State"],
-        //         type: item.fields["System.WorkItemType"],
-        //         assignedTo: item.fields["System.AssignedTo"] != undefined ? item.fields["System.AssignedTo"]["displayName"] : ""
-        //     })
-        // })
-        // console.log(JSON.stringify(newResults))
-        // setState((previous) => ({ ...previous, isLoading: false, results: newResults}))
     }
 
     const onSearchChange = async (searchText: string) => {
@@ -112,34 +94,6 @@ export default function Command() {
 
         await issueSearch(searchText)
     }
-
-    // Removing the project list, at least temporarily because it doesn't affect results.
-    //
-    // useEffect(() => {
-    //     async function fetchProjects() {
-    //         try {
-    //             const projects = await devops.getProjects()
-    //             console.log(`fetched ${projects.length} projects.`)
-    //             const defaultProject = findProjectIdByName(projects, prefs.project)
-    //             console.log(`default project: ${defaultProject}`)
-    //             setState((previous) => ({
-    //                 ...previous,
-    //                 isLoading: false,
-    //                 selectedProjectId: defaultProject,
-    //                 projects: projects
-    //             }))
-    //         } catch (error) {
-    //             setState((previous) => ({
-    //                 ...previous,
-    //                 error: error instanceof Error ? error : new Error("Something went wrong"),
-    //                 isLoading: false,
-    //                 projects: []
-    //             }))
-    //         }
-    //     }
-
-    //     fetchProjects();
-    // }, [])
 
     if (state.error) {
         showToast(Toast.Style.Failure, state.error.name, state.error.message)
@@ -152,20 +106,6 @@ export default function Command() {
         isLoading={(!state.projects && !state.error) || state.isLoading}
         enableFiltering={false}
         throttle={true}
-        // searchBarAccessory={
-        //     <List.Dropdown
-        //         tooltip="Select Project"
-        //         storeValue={true}
-        //         onChange={(newProject) => {
-        //             setState((previous) => ({ ...previous, selectedProjectId: newProject}))
-        //             issueSearch(state.searchText)
-        //         }}
-        //     >
-        //         { state.projects?.map((project) => (
-        //             <List.Dropdown.Item key={project.id} title={project.name || ""} value={project.id || ""} /> 
-        //         )) }
-        //     </List.Dropdown>
-        // }
         >
             { state.results?.map((result) => (
                 <List.Item 
@@ -256,7 +196,6 @@ function buildWiql(searchText: string): string {
     whereClauses = whereClauses.concat(textClauses)
     console.log(whereClauses)
 
-    //let assignedToRegex: RegExp = /(["'])(?:\\.|[^\\])*?\1/
     const assignedTo = collectPrefixed("@", terms)
         .map((term) => term.toLowerCase() == "me" ? `[System.AssignedTo] = @${term}` : `[System.AssignedTo] Contains "${term}"`)
     whereClauses = whereClauses.concat(assignedTo)
