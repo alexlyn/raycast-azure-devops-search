@@ -17,7 +17,7 @@ interface State {
     projects: CoreInterfaces.TeamProject[],
     selectedProjectId: string,
     selectedProjectName: string,
-    searchText?: string,
+    searchText: string,
     results?: WorkItem[];
     error?: Error;
 }
@@ -34,7 +34,7 @@ enum workItemType {
     USER_STORY = "User Story"
 }
 
-const prefs: { domain: string; user: string; token: string; project: string; icons: string } = getPreferenceValues()
+const prefs: { domain: string; user: string; token: string; project: string; icons: string; showRecent: boolean } = getPreferenceValues()
 
 function getWorkItemTypeIcon(type: string) {
     const iconTypeModifier = prefs.icons == "solid" ? "-solid" : ""
@@ -64,7 +64,7 @@ function getWorkItemTypeIcon(type: string) {
 }
 
 export default function Command() {
-    const [state, setState] = useState<State>({ isLoading: false, projects: [], selectedProjectName: prefs.project, selectedProjectId: ""});
+    const [state, setState] = useState<State>({ isLoading: false, projects: [], selectedProjectName: prefs.project, selectedProjectId: "", searchText: ""});
 
     const markdownLink = (item: WorkItem) => `[${item.title}](${encodeURI(`https://${prefs.domain}/${state.selectedProjectName}/_workitems/edit/${item.id}`)})`
     const htmlLink = (item: WorkItem) => `<a href="${encodeURI(`https://${prefs.domain}/${state.selectedProjectName}/_workitems/edit/${item.id}`)}">${item.title}</a>`
@@ -142,8 +142,7 @@ export default function Command() {
                 setState((previous) => ({ ...previous, error: new PresentableError("Error", "Error getting recently updated work items")}))
             }
         }
-
-        getRecentlyUpdated()
+        if (prefs.showRecent) getRecentlyUpdated()
     }, [])
 
     if (state.error) {
@@ -158,12 +157,17 @@ export default function Command() {
         enableFiltering={false}
         throttle={true}
         >
-            { state.results?.map((result) => (
+            {state.searchText === "" && !state.results ? (
+                <List.EmptyView
+                    icon={{source: "command-icon-small.png"}}
+                    title="Search for work items"
+                    description="Type search text. Search by user with @name or work item type with #type." />
+            ) : ( state.results?.map((result) => (
                 <List.Item 
                     title={result.id + " " + result.title} 
                     key={result.id}
                     icon={{
-                        source: getWorkItemTypeIcon(result.type)
+                        source: getWorkItemTypeIcon(result.type),
                     }}
                     actions={
                         <ActionPanel>
@@ -180,7 +184,8 @@ export default function Command() {
                     accessories={[
                         { icon: { source: getIconForState(result.state) }, tooltip: result.state, text: result.assignedTo }
                     ]} />
-            ))}
+            )))}
+            
 
         </List>
     );
@@ -271,8 +276,8 @@ function buildWiql(searchText: string): string {
 
     const wiql = `SELECT [System.Id], [System.Title], [System.State], [System.WorkItemType], [System.AssignedTo]
     FROM WorkItems
-    ORDER BY [Changed Date] Desc
     WHERE ${whereClauses.join(" AND ")}
+    ORDER BY [Changed Date] Desc
     `
     console.log(wiql)
     return wiql
