@@ -8,7 +8,7 @@ import * as CoreInterfaces from "azure-devops-node-api/interfaces/CoreInterfaces
 import { QueryType } from "azure-devops-node-api/interfaces/WorkItemTrackingInterfaces";
 import { ErrorText, PresentableError } from "./exception"
 
-const prefs: { domain: string; user: string; token: string; project: string } = getPreferenceValues()
+const prefs: { domain: string; user: string; token: string; project: string; icons: string } = getPreferenceValues()
 
 interface Query {
     id: string,
@@ -149,13 +149,15 @@ export default function Command() {
 }
 
 function getQueryTypeIcon(type?: QueryType): string {
+    const iconTypeModifier = prefs.icons == "solid" ? "-solid" : ""
+
     switch (type) {
         case QueryType.Flat:
-            return "query-flat.svg"
+            return "query-flat" + iconTypeModifier + ".svg"
         case QueryType.Tree:
-            return "query-tree.svg"
+            return "query-tree" + iconTypeModifier + ".svg"
         case QueryType.OneHop:
-            return "query-onehop.svg"
+            return "query-onehop" + iconTypeModifier + ".svg"
     }
     return "query-flat.svg"
 }
