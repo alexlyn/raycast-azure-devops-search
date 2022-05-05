@@ -1,10 +1,8 @@
-import { ActionPanel, Action, List, Icon, showToast, Toast } from "@raycast/api"
-import { Detail } from "@raycast/api";
-import { getPreferenceValues } from "@raycast/api"
+import { ActionPanel, Action, Detail, getPreferenceValues, List, Icon, showToast, Toast } from "@raycast/api"
 import { useEffect, useState } from "react";
-import * as devops from "./devops"
 import * as CoreInterfaces from "azure-devops-node-api/interfaces/CoreInterfaces"
-import { ErrorText } from "./exception"
+import * as devops from "./devops"
+import { ErrorText, PresentableError } from "./exception"
 
 export interface WorkItem {
     id: number,
@@ -24,28 +22,46 @@ interface State {
     error?: Error;
 }
 
-function getWorkItemTypeIcon(type: string) {
-    switch (type) {
-        case "Task":
-            return "task.svg"
-        case "Bug":
-            return "bug.svg"
-        case "Epic":
-            return "epic.svg"
-        case "Feature":
-            return "feature.svg"
-        case "Product Backlog Item":
-            return "pbi.svg"
-        case "Product Portfolio":
-            return "portfolio.svg"
-        case "Test Case":
-            return "testcase.svg" 
-        default:
-            return "task.svg"
-    }
+enum workItemType {
+    BUG = "Bug",
+    EPIC = "Epic",
+    FEATURE = "Feature",
+    IMPEDIMENT = "Impediment",
+    PORTFOLIO ="Product Portfolio",
+    PBI = "Product Backlog Item",
+    TASK = "Task",
+    TEST = "Test",
+    USER_STORY = "User Story"
 }
 
-const prefs: { domain: string; user: string; token: string; project: string } = getPreferenceValues()
+const prefs: { domain: string; user: string; token: string; project: string; icons: string } = getPreferenceValues()
+
+function getWorkItemTypeIcon(type: string) {
+    const iconTypeModifier = prefs.icons == "solid" ? "-solid" : ""
+
+    switch (type) {
+        case workItemType.BUG:
+            return "bug" + iconTypeModifier + ".svg"
+        case workItemType.EPIC:
+            return "epic" + iconTypeModifier + ".svg"
+        case workItemType.FEATURE:
+            return "feature" + iconTypeModifier + ".svg"
+        case workItemType.IMPEDIMENT:
+            return "impediment" + iconTypeModifier + ".svg"
+        case workItemType.PBI:
+            return "pbi" + iconTypeModifier + ".svg"
+        case workItemType.PORTFOLIO:
+            return "portfolio" + iconTypeModifier + ".svg"
+        case workItemType.TASK:
+            return "task" + iconTypeModifier + ".svg"
+        case workItemType.TEST:
+            return "testcase" + iconTypeModifier + ".svg" 
+        case workItemType.USER_STORY:
+            return "userstory" + iconTypeModifier + ".svg"
+        default:
+            return "task" + iconTypeModifier + ".svg"
+    }
+}
 
 export default function Command() {
     const [state, setState] = useState<State>({ isLoading: false, projects: [], selectedProjectName: prefs.project, selectedProjectId: ""});
@@ -94,6 +110,41 @@ export default function Command() {
 
         await issueSearch(searchText)
     }
+    
+    useEffect(() => {
+        async function getRecentlyUpdated() {
+            try {
+                setState((previous) => ({ ...previous, isLoading: true}))
+
+                devops.getRecentlyUpdated(20)
+                    .then((results) => {
+                        let newResults: WorkItem[] = []
+                        results.map((item) => {
+                            if (item.id == undefined || item.fields == undefined) return
+        
+                            newResults.push({
+                                id: item.id,
+                                title: item.fields["System.Title"],
+                                state: item.fields["System.State"],
+                                type: item.fields["System.WorkItemType"],
+                                assignedTo: item.fields["System.AssignedTo"] != undefined ? item.fields["System.AssignedTo"]["displayName"] : ""
+                            })
+                        })
+                        setState((previous) => ({ ...previous, results: newResults}))
+                    })
+                    .catch((e) => {
+                        setState((previous) => ({ ...previous, results: [], error: ErrorText(e.name, e.message)}))
+                    })
+                    .finally(() => {
+                        setState((previous) => ({ ...previous, isLoading: false}))
+                    })
+            } catch (error) {
+                setState((previous) => ({ ...previous, error: new PresentableError("Error", "Error getting recently updated work items")}))
+            }
+        }
+
+        getRecentlyUpdated()
+    }, [])
 
     if (state.error) {
         showToast(Toast.Style.Failure, state.error.name, state.error.message)
@@ -138,11 +189,20 @@ export default function Command() {
 function getIconForState(state: string): string {
     let icon = "circle-gray.svg"
     switch (state) {
+        case "Approved":
+            icon = "circle-lightgray.svg"
+            break
+        case "By Design":
+            icon = "circle-lightgreen.svg"
+            break
         case "In Progress":
             icon = "circle-blue.svg"
             break
         case "Blocked":
             icon = "circle-red.svg"
+            break
+        case "No Repro":
+            icon = "circle-blue.svg"
             break
         case "Won't Fix":
             icon = "circle-red.svg"
@@ -152,6 +212,9 @@ function getIconForState(state: string): string {
             break
         case "Resolved":
             icon = "circle-orange.svg"
+            break
+        case "Re-Open":
+            icon = "circle-lightgray.svg"
             break
         case "Done":
             icon = "circle-green.svg"

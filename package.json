@@ -45,6 +45,15 @@
       "required": true,
       "title": "Project",
       "description": "Default project to search"
+    },
+    {
+      "name": "icons",
+      "type": "dropdown",
+      "required": true,
+      "title": "Icons",
+      "description": "Icons to use for work items and queries",
+      "data": [{"title": "Solid", "value": "solid"}, {"title": "Outline", "value": "outline"}],
+      "default": "solid"
     }
   ],
   "dependencies": {
