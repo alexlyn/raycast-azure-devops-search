@@ -2,7 +2,7 @@
   "$schema": "https://www.raycast.com/schemas/extension.json",
   "name": "azure-devops-search",
   "title": "Azure DevOps Search",
-  "description": "Search Azure DevOps for work items, queries and source code",
+  "description": "Search Azure DevOps for work items and queries",
   "icon": "command-icon.png",
   "author": "alexlyn",
   "categories": [
@@ -13,13 +13,13 @@
   "commands": [
     {
       "name": "workitem",
-      "title": "Search work items",
+      "title": "Search Work Items",
       "description": "Search Azure DevOps issues by ID, text, type and project",
       "mode": "view"
     },
     {
       "name": "query",
-      "title": "Search queries",
+      "title": "Search Queries",
       "description": "Search Azure DevOps queries",
       "mode": "view"
     }
@@ -45,6 +45,14 @@
       "required": true,
       "title": "Project",
       "description": "Default project to search"
+    },
+    {
+      "name": "showRecent",
+      "type": "checkbox",
+      "required" :true,
+      "default": true,
+      "title": "Show recently updated work items",
+      "description": "Show recently updated work items in the search results"
     },
     {
       "name": "icons",

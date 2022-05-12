@@ -6,6 +6,9 @@ import * as CoreInterfaces from "azure-devops-node-api/interfaces/CoreInterfaces
 import * as WorkItemTrackingInterfaces from "azure-devops-node-api/interfaces/WorkItemTrackingInterfaces"
 import { PresentableError } from "./exception"
 
+const numWorkItemResults = 25
+const numQueryResults = 25
+
 const prefs: { domain: string; user: string; token: string; project: string } = getPreferenceValues()
 
 // Create the Azure DevOps connection
@@ -74,7 +77,7 @@ export async function workItemSearch(
             }
         }
 
-        let queryResult = await witClient.queryByWiql(wiqlQuery, teamContext, undefined, 20)
+        let queryResult = await witClient.queryByWiql(wiqlQuery, teamContext, undefined, numWorkItemResults)
 
         if (queryResult.workItems == undefined || queryResult.workItems.length == 0) {
             const empty: WorkItemTrackingInterfaces.WorkItem[] = []
@@ -122,7 +125,10 @@ export async function querySearch(
             }
         }
         witClient.getRecentActivityData()
-        let queryResult = await witClient.searchQueries(teamContext && teamContext.project ? teamContext.project : prefs.project, search, 20)
+        let queryResult = await witClient.searchQueries(
+            teamContext && teamContext.project ? teamContext.project : prefs.project, 
+            search, 
+            numQueryResults)
 
         return queryResult
     } catch (error) {
