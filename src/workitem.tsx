@@ -1,4 +1,4 @@
-import { ActionPanel, Action, Detail, getPreferenceValues, List, Icon, showToast, Toast } from "@raycast/api"
+import { ActionPanel, Action, Detail, getPreferenceValues, List, LocalStorage, Icon, showToast, Toast } from "@raycast/api"
 import { useEffect, useState } from "react";
 import * as CoreInterfaces from "azure-devops-node-api/interfaces/CoreInterfaces"
 import * as devops from "./devops"
@@ -6,6 +6,8 @@ import { ErrorText, PresentableError } from "./exception"
 
 export interface WorkItem {
     id: number,
+    project: string,
+    icon: string,
     title: string,
     state: string,
     type: string,
@@ -36,39 +38,14 @@ enum workItemType {
 
 const prefs: { domain: string; user: string; token: string; project: string; icons: string; showRecent: boolean } = getPreferenceValues()
 
-function getWorkItemTypeIcon(type: string) {
-    const iconTypeModifier = prefs.icons == "solid" ? "-solid" : ""
-
-    switch (type) {
-        case workItemType.BUG:
-            return "bug" + iconTypeModifier + ".svg"
-        case workItemType.EPIC:
-            return "epic" + iconTypeModifier + ".svg"
-        case workItemType.FEATURE:
-            return "feature" + iconTypeModifier + ".svg"
-        case workItemType.IMPEDIMENT:
-            return "impediment" + iconTypeModifier + ".svg"
-        case workItemType.PBI:
-            return "pbi" + iconTypeModifier + ".svg"
-        case workItemType.PORTFOLIO:
-            return "portfolio" + iconTypeModifier + ".svg"
-        case workItemType.TASK:
-            return "task" + iconTypeModifier + ".svg"
-        case workItemType.TEST:
-            return "testcase" + iconTypeModifier + ".svg" 
-        case workItemType.USER_STORY:
-            return "userstory" + iconTypeModifier + ".svg"
-        default:
-            return "task" + iconTypeModifier + ".svg"
-    }
-}
+var gatheringIcons = false
 
 export default function Command() {
     const [state, setState] = useState<State>({ isLoading: false, projects: [], selectedProjectName: prefs.project, selectedProjectId: "", searchText: ""});
 
     const markdownLink = (item: WorkItem) => `[${item.title}](${encodeURI(`https://${prefs.domain}/${state.selectedProjectName}/_workitems/edit/${item.id}`)})`
     const htmlLink = (item: WorkItem) => `<a href="${encodeURI(`https://${prefs.domain}/${state.selectedProjectName}/_workitems/edit/${item.id}`)}">${item.title}</a>`
-    
+
     const issueSearch = async (searchText?: string) => {
         if (searchText == undefined) return
 
@@ -79,8 +56,8 @@ export default function Command() {
         setState((previous) => ({ ...previous, isLoading: true, searchText: searchText}))
 
         devops.workItemSearch(wiql, state.selectedProjectId)
-            .then((results) => {
-                console.log(`got ${results.length} results`)
+            .then(async (results) => {
+                console.log(`Got ${results.length} results`)
 
                 let newResults: WorkItem[] = []
                 results.map((item) => {
@@ -88,13 +65,14 @@ export default function Command() {
         
                     newResults.push({
                         id: item.id,
+                        project: item.fields["System.TeamProject"],
+                        icon: item.fields["Local.IconUrl"],
                         title: item.fields["System.Title"],
                         state: item.fields["System.State"],
                         type: item.fields["System.WorkItemType"],
                         assignedTo: item.fields["System.AssignedTo"] != undefined ? item.fields["System.AssignedTo"]["displayName"] : ""
                     })
                 })
-                console.log(JSON.stringify(newResults))
                 setState((previous) => ({ ...previous, results: newResults}))
             })
             .catch((e) => {
@@ -119,17 +97,19 @@ export default function Command() {
                 devops.getRecentlyUpdated(20)
                     .then((results) => {
                         let newResults: WorkItem[] = []
-                        results.map((item) => {
+                        results.map(async (item) => {
                             if (item.id == undefined || item.fields == undefined) return
-        
                             newResults.push({
                                 id: item.id,
+                                project: item.fields["System.TeamProject"],
+                                icon: item.fields["Local.IconUrl"],
                                 title: item.fields["System.Title"],
                                 state: item.fields["System.State"],
                                 type: item.fields["System.WorkItemType"],
                                 assignedTo: item.fields["System.AssignedTo"] != undefined ? item.fields["System.AssignedTo"]["displayName"] : ""
                             })
                         })
+                        console.log(JSON.stringify(newResults))    
                         setState((previous) => ({ ...previous, results: newResults}))
                     })
                     .catch((e) => {
@@ -166,9 +146,7 @@ export default function Command() {
                 <List.Item 
                     title={result.id + " " + result.title} 
                     key={result.id}
-                    icon={{
-                        source: getWorkItemTypeIcon(result.type),
-                    }}
+                    icon={{source: result.icon}}
                     actions={
                         <ActionPanel>
                             <ActionPanel.Section title="URL">
@@ -242,11 +220,10 @@ function buildWiql(searchText: string): string {
 
     // Search string is a number. Search by work item ID
     if (isItemId(searchText)) {
-        return `SELECT [System.Id], [System.Title], [System.State], [System.WorkItemType], [System.AssignedTo]
+        return `SELECT [System.Id], [System.TeamProject], [System.Title], [System.State], [System.WorkItemType], [System.AssignedTo]
                 FROM WorkItems
                 WHERE [System.Id] = ${searchText}`
     }
-    console.log('not item search. building query')
 
     // Build WIQL
     const spaceAndInvalidChars = /[ "]/
@@ -274,7 +251,7 @@ function buildWiql(searchText: string): string {
 
     if (whereClauses.length == 0) return ""
 
-    const wiql = `SELECT [System.Id], [System.Title], [System.State], [System.WorkItemType], [System.AssignedTo]
+    const wiql = `SELECT [System.Id], [System.TeamProject], [System.Title], [System.State], [System.WorkItemType], [System.AssignedTo]
     FROM WorkItems
     WHERE ${whereClauses.join(" AND ")}
     ORDER BY [Changed Date] Desc

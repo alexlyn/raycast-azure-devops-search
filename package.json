@@ -43,13 +43,13 @@
       "name": "project",
       "type": "textfield",
       "required": true,
-      "title": "Project",
-      "description": "Default project to search"
+      "title": "Default Project",
+      "description": "Default project for query searches"
     },
     {
       "name": "showRecent",
       "type": "checkbox",
-      "required" :true,
+      "required": true,
       "default": true,
       "title": "Show recently updated work items",
       "description": "Show recently updated work items in the search results"
@@ -60,12 +60,22 @@
       "required": true,
       "title": "Icons",
       "description": "Icons to use for work items and queries",
-      "data": [{"title": "Solid", "value": "solid"}, {"title": "Outline", "value": "outline"}],
+      "data": [
+        {
+          "title": "Solid",
+          "value": "solid"
+        },
+        {
+          "title": "Outline",
+          "value": "outline"
+        }
+      ],
       "default": "solid"
     }
   ],
   "dependencies": {
     "@raycast/api": "^1.32.1",
+    "axios": "^0.27.2",
     "azure-devops-node-api": "^11.1.1",
     "node-fetch": "^3.2.3"
   },

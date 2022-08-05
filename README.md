@@ -5,7 +5,7 @@ Search for work items and queries in Azure DevOps.
 ## Features
 
 - Work item search
-  - Searcy by assignee with @. For example @alex.
+  - Search by assignee with @. For example @alex.
   - Search by work item type with #. For example #bug
 - Query search
 - Use the following actions on found entities:

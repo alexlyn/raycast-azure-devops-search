@@ -1,4 +1,5 @@
-import { getPreferenceValues } from "@raycast/api"
+import { getPreferenceValues, LocalStorage } from "@raycast/api"
+import * as axios from "axios"
 import * as azdev from "azure-devops-node-api"
 import * as wit from "azure-devops-node-api/WorkItemTrackingApi"
 import * as core from "azure-devops-node-api/CoreApi"
@@ -22,7 +23,7 @@ export async function getRecentlyUpdated(
         let witClient = await connection.getWorkItemTrackingApi()
 
         // Execute the query
-        const wiql = `SELECT [System.Id], [System.Title], [System.State], [System.WorkItemType], [System.AssignedTo]
+        const wiql = `SELECT [System.Id], [System.TeamProject], [System.Title], [System.State], [System.WorkItemType], [System.AssignedTo]
         FROM WorkItems
         ORDER BY [Changed Date] Desc
         `
@@ -46,6 +47,14 @@ export async function getRecentlyUpdated(
             fields: fields
         }
         let workItems = await witClient.getWorkItemsBatch(b)
+
+        // Add icons to results
+        for (let wi of workItems) {
+            if (wi.fields) {
+                wi.fields["Local.IconUrl"] = await getWorkItemIcon(wi.fields["System.TeamProject"] as string, wi.fields["System.WorkItemType"] as string)
+            }
+        }
+        
         return workItems
     } catch (error) {
         throw new PresentableError("Error", "Cannot connect to Azure DevOps. Check domain and PAT.");
@@ -95,6 +104,14 @@ export async function workItemSearch(
             fields: fields
         }
         let workItems = await witClient.getWorkItemsBatch(b)
+
+        // Add icons to results
+        for (let wi of workItems) {
+            if (wi.fields) {
+                wi.fields["Local.IconUrl"] = await getWorkItemIcon(wi.fields["System.TeamProject"] as string, wi.fields["System.WorkItemType"] as string)
+            }
+        }
+
         return workItems
     } catch (error) {
         console.log(error);
@@ -135,7 +152,6 @@ export async function querySearch(
         console.log(error);
         throw new PresentableError("Error", "Cannot connect to Azure DevOps. Check domain and PAT.");
     }
-
 }
 
 export async function getProjects(): Promise<CoreInterfaces.TeamProject[]> {
@@ -144,4 +160,53 @@ export async function getProjects(): Promise<CoreInterfaces.TeamProject[]> {
     let projects = await coreClient.getProjects();
 
     return projects
+}
+
+// Get icons for all work item types in a project
+export async function getWorkItemIcons(project: string): Promise<{[key: string]: string}> {
+
+    var iconMap: { [key: string]: string } = {}
+
+    const url = `https://${prefs.domain}/${project}/_apis/wit/workitemtypes?api-version=6.0`
+
+    var response = await axios.default.get(url, {
+        auth: {
+            username: "",
+            password: prefs.token
+        }
+    })
+
+    for (let wi of response.data.value) {
+        const commonHeaders = axios.default.defaults.headers.common
+        axios.default.defaults.headers.common = {}
+        var response = await axios.default.get(wi.icon.url)
+        axios.default.defaults.headers.common = commonHeaders
+
+        iconMap[`${project}!!${wi.name}`] = `data:image/svg+xml;utf8,${response.data}`
+    }
+
+    return iconMap
+}
+
+// Get icon for a work item type
+// TODO: Reload icons periodically (e.g. every 5 days)
+async function getWorkItemIcon(project: string, type: string): Promise<string> {
+    // If the icon URL is already in the cache, return it
+    var iconUrl = await LocalStorage.getItem<string>(`${project}!!${type}`)
+    if (iconUrl != undefined) return iconUrl
+
+    console.log(`Can't find icon for ${type} in ${project}. Fetching icons.`)
+
+    // Gather icons
+    var results = await getWorkItemIcons(project)
+
+    // Enumerate the results and cache the icon URL
+    for (var key in results) {
+        await LocalStorage.setItem(`${key}`, results[key])
+        if (key == `${project}!!${type}`) {
+            iconUrl = results[key]
+        }
+    }
+
+    return (iconUrl != undefined) ? iconUrl : ""
 }
