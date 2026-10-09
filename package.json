@@ -51,15 +51,15 @@
       "type": "checkbox",
       "required": true,
       "default": true,
-      "title": "Show recently updated work items",
+      "label": "Show recently updated work items",
       "description": "Show recently updated work items in the search results"
     },
     {
       "name": "icons",
       "type": "dropdown",
       "required": true,
-      "title": "Icons",
-      "description": "Icons to use for work items and queries",
+      "title": "Query Icons",
+      "description": "Icons to use for queries",
       "data": [
         {
           "title": "Solid",
@@ -74,24 +74,21 @@
     }
   ],
   "dependencies": {
-    "@raycast/api": "^1.32.1",
-    "axios": "^0.27.2",
-    "azure-devops-node-api": "^11.1.1",
-    "node-fetch": "^3.2.3"
+    "@raycast/api": "^2.7.3",
+    "axios": "^1.7.9",
+    "azure-devops-node-api": "^11.1.1"
   },
   "devDependencies": {
-    "@types/node": "~16.10.0",
-    "@types/react": "^17.0.28",
-    "@typescript-eslint/eslint-plugin": "^5.0.0",
-    "@typescript-eslint/parser": "^5.0.0",
-    "eslint": "^7.32.0",
-    "eslint-config-prettier": "^8.3.0",
-    "prettier": "^2.5.1",
-    "react-devtools": "^4.19.2",
-    "typescript": "^4.4.3"
+    "@raycast/eslint-config": "^2.2.0",
+    "@types/node": "22.19.17",
+    "@types/react": "19.0.10",
+    "eslint": "^9.39.5",
+    "prettier": "^3.4.2",
+    "react-devtools": "6.1.1",
+    "typescript": "^5.7.3"
   },
   "scripts": {
-    "build": "ray build -e dist",
+    "build": "ray build -e dist -o dist",
     "dev": "ray develop",
     "fix-lint": "ray lint --fix",
     "lint": "ray lint"
